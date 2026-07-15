@@ -2,6 +2,7 @@ import { ImagePickerAsset } from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 
 const PROFILE_PHOTOS_BUCKET = 'avatars';
+const PROFILE_SELECT = 'id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator';
 
 export type Profile = {
   avatar_url: string | null;
@@ -29,12 +30,12 @@ type SaveProfileInput = {
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
+    .select(PROFILE_SELECT)
     .eq('id', userId)
     .maybeSingle<Profile>();
 
   if (error) {
-    throw error;
+    throwSupabaseError(error, 'Unable to load profile');
   }
 
   return data;
@@ -50,6 +51,26 @@ export async function saveProfile({
   userId,
 }: SaveProfileInput) {
   const trimmedUsername = username.trim();
+  const trimmedBio = bio?.trim() || null;
+  const normalizedPhone = phone?.trim() || null;
+
+  if (!trimmedUsername) {
+    throw new Error('Enter your username');
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throwSupabaseError(userError, 'Unable to verify signed in user');
+  }
+
+  if (!user || user.id !== userId) {
+    throw new Error('Sign in again to save your profile');
+  }
+
   const avatarUrl = image ? await uploadProfilePhoto(userId, image) : currentAvatarUrl ?? null;
 
   const { data, error } = await supabase
@@ -57,10 +78,10 @@ export async function saveProfile({
     .upsert(
       {
         avatar_url: avatarUrl,
-        bio: bio?.trim() || null,
+        bio: trimmedBio,
         id: userId,
         name: trimmedUsername,
-        phone,
+        phone: normalizedPhone,
         show_last_seen: privacy?.show_last_seen ?? true,
         show_online_status: privacy?.show_online_status ?? true,
         show_typing_indicator: privacy?.show_typing_indicator ?? true,
@@ -69,11 +90,11 @@ export async function saveProfile({
       },
       { onConflict: 'id' },
     )
-    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
+    .select(PROFILE_SELECT)
     .single<Profile>();
 
   if (error) {
-    throw error;
+    throwSupabaseError(error, 'Unable to save profile');
   }
 
   return data;
@@ -89,7 +110,7 @@ export async function updateLastSeen(userId: string) {
     .eq('id', userId);
 
   if (error) {
-    throw error;
+    throwSupabaseError(error, 'Unable to update last seen');
   }
 }
 
@@ -104,11 +125,11 @@ export async function updatePresencePrivacy(
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId)
-    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
+    .select(PROFILE_SELECT)
     .single<Profile>();
 
   if (error) {
-    throw error;
+    throwSupabaseError(error, 'Unable to update privacy settings');
   }
 
   return data;
@@ -132,6 +153,11 @@ export function subscribeToProfile(userId: string, onProfile: (profile: Profile)
 
 async function uploadProfilePhoto(userId: string, image: ImagePickerAsset) {
   const response = await fetch(image.uri);
+
+  if (!response.ok) {
+    throw new Error('Unable to read selected profile photo');
+  }
+
   const arrayBuffer = await response.arrayBuffer();
   const contentType = image.mimeType ?? 'image/jpeg';
   const extension = getImageExtension(image.fileName, contentType);
@@ -139,11 +165,11 @@ async function uploadProfilePhoto(userId: string, image: ImagePickerAsset) {
 
   const { error } = await supabase.storage.from(PROFILE_PHOTOS_BUCKET).upload(path, arrayBuffer, {
     contentType,
-    upsert: true,
+    upsert: false,
   });
 
   if (error) {
-    throw error;
+    throwSupabaseError(error, 'Unable to upload profile photo');
   }
 
   const { data } = supabase.storage.from(PROFILE_PHOTOS_BUCKET).getPublicUrl(path);
@@ -167,4 +193,12 @@ function getImageExtension(fileName: string | null | undefined, contentType: str
   }
 
   return 'jpg';
+}
+
+function throwSupabaseError(error: unknown, fallbackMessage: string): never {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    throw new Error(error.message);
+  }
+
+  throw new Error(fallbackMessage);
 }
