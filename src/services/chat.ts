@@ -1,14 +1,10 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { ImagePickerAsset } from 'expo-image-picker';
 import { supabase } from '../lib/supabase';
 import { Profile } from './profiles';
-
-const GROUP_PHOTOS_BUCKET = 'group-photos';
 
 export type Conversation = {
   created_at: string;
   direct_key: string | null;
-  photo_url: string | null;
   id: string;
   name: string | null;
   type: 'direct' | 'group';
@@ -68,7 +64,7 @@ export async function getOrCreateDirectConversation(userId: string, otherUserId:
       },
       { onConflict: 'direct_key' },
     )
-    .select('id,type,direct_key,name,photo_url,created_at,updated_at')
+    .select('id,type,direct_key,name,created_at,updated_at')
     .single<Conversation>();
 
   if (conversationError) {
@@ -98,14 +94,12 @@ export async function getOrCreateDirectConversation(userId: string, otherUserId:
 
 type CreateGroupConversationInput = {
   currentUserId: string;
-  image: ImagePickerAsset | null;
   members: Profile[];
   name: string;
 };
 
 export async function createGroupConversation({
   currentUserId,
-  image,
   members,
   name,
 }: CreateGroupConversationInput) {
@@ -119,18 +113,16 @@ export async function createGroupConversation({
     throw new Error('Select at least one contact');
   }
 
-  const photoUrl = image ? await uploadGroupPhoto(currentUserId, image) : null;
   const now = new Date().toISOString();
 
   const { data: conversation, error: conversationError } = await supabase
     .from('conversations')
     .insert({
       name: trimmedName,
-      photo_url: photoUrl,
       type: 'group',
       updated_at: now,
     })
-    .select('id,type,direct_key,name,photo_url,created_at,updated_at')
+    .select('id,type,direct_key,name,created_at,updated_at')
     .single<Conversation>();
 
   if (conversationError) {
@@ -300,43 +292,4 @@ export function unsubscribe(channel: RealtimeChannel | null) {
 
 function getDirectKey(userId: string, otherUserId: string) {
   return [userId, otherUserId].sort().join(':');
-}
-
-async function uploadGroupPhoto(userId: string, image: ImagePickerAsset) {
-  const response = await fetch(image.uri);
-  const arrayBuffer = await response.arrayBuffer();
-  const contentType = image.mimeType ?? 'image/jpeg';
-  const extension = getImageExtension(image.fileName, contentType);
-  const path = `${userId}/${Date.now()}.${extension}`;
-
-  const { error } = await supabase.storage.from(GROUP_PHOTOS_BUCKET).upload(path, arrayBuffer, {
-    contentType,
-    upsert: true,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  const { data } = supabase.storage.from(GROUP_PHOTOS_BUCKET).getPublicUrl(path);
-
-  return data.publicUrl;
-}
-
-function getImageExtension(fileName: string | null | undefined, contentType: string) {
-  const fileExtension = fileName?.split('.').pop()?.toLowerCase();
-
-  if (fileExtension) {
-    return fileExtension;
-  }
-
-  if (contentType === 'image/png') {
-    return 'png';
-  }
-
-  if (contentType === 'image/webp') {
-    return 'webp';
-  }
-
-  return 'jpg';
 }

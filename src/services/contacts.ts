@@ -72,7 +72,7 @@ export async function getContactsWithRegistrationStatus() {
 async function getRegisteredProfiles() {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,avatar_url,phone')
+    .select('id,name,phone')
     .not('phone', 'is', null);
 
   if (error) {

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,7 +28,6 @@ type GroupSetupScreenProps = {
 export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetupScreenProps) {
   const [contacts, setContacts] = useState<MatchedContact[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
-  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState('');
@@ -84,28 +81,6 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
     });
   };
 
-  const pickImage = async () => {
-    setErrorMessage('');
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      setErrorMessage('Photo library permission is required');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      mediaTypes: ['images'],
-      quality: 0.85,
-    });
-
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
-  };
-
   const createGroup = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
@@ -113,7 +88,6 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
     try {
       const conversation = await createGroupConversation({
         currentUserId,
-        image,
         members: selectedMembers,
         name,
       });
@@ -142,24 +116,6 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
         </View>
 
         <View style={styles.card}>
-          <View style={styles.photoRow}>
-            <View style={styles.photo}>
-              {image ? (
-                <Image source={{ uri: image.uri }} style={styles.photoImage} />
-              ) : (
-                <Text style={styles.photoInitial}>{name.trim().charAt(0).toUpperCase() || 'G'}</Text>
-              )}
-            </View>
-            <View style={styles.photoCopy}>
-              <Text style={styles.cardTitle}>Group photo</Text>
-              <AppButton
-                disabled={isSubmitting}
-                label={image ? 'Change photo' : 'Choose photo'}
-                onPress={pickImage}
-                variant="secondary"
-              />
-            </View>
-          </View>
           <TextInput
             editable={!isSubmitting}
             onChangeText={setName}
@@ -267,11 +223,6 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     padding: spacing.md,
   },
-  cardTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
   checkbox: {
     alignItems: 'center',
     borderColor: '#3A3A3A',
@@ -357,35 +308,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     paddingHorizontal: spacing.md,
-  },
-  photo: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderRadius: 36,
-    borderWidth: 1,
-    height: 72,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 72,
-  },
-  photoCopy: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  photoImage: {
-    height: '100%',
-    width: '100%',
-  },
-  photoInitial: {
-    color: colors.accent,
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  photoRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
   },
   section: {
     gap: spacing.sm,

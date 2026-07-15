@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import * as ImagePicker from 'expo-image-picker';
-import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton, Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
 import { saveProfile } from '../services';
@@ -13,31 +12,8 @@ type ProfileSetupScreenProps = {
 
 export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupScreenProps) {
   const [name, setName] = useState('');
-  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const pickImage = async () => {
-    setErrorMessage('');
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      setErrorMessage('Photo library permission is required');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      mediaTypes: ['images'],
-      quality: 0.85,
-    });
-
-    if (!result.canceled) {
-      setImage(result.assets[0]);
-    }
-  };
 
   const submitProfile = async () => {
     if (!userId) {
@@ -50,16 +26,11 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
       return;
     }
 
-    if (!image) {
-      setErrorMessage('Choose a profile photo');
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessage('');
 
     try {
-      await saveProfile({ image, name, phone, userId });
+      await saveProfile({ name, phone, userId });
       await onComplete();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save profile');
@@ -74,24 +45,6 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
         <Text style={styles.kicker}>Profile</Text>
         <Text style={styles.title}>Set up your identity</Text>
         <View style={styles.card}>
-          <View style={styles.photoRow}>
-            <View style={styles.photo}>
-              {image ? (
-                <Image source={{ uri: image.uri }} style={styles.photoImage} />
-              ) : (
-                <Text style={styles.photoInitial}>{name.trim().charAt(0).toUpperCase() || 'S'}</Text>
-              )}
-            </View>
-            <View style={styles.photoCopy}>
-              <Text style={styles.body}>Profile photo</Text>
-              <AppButton
-                disabled={isSubmitting}
-                label={image ? 'Change photo' : 'Choose photo'}
-                onPress={pickImage}
-                variant="secondary"
-              />
-            </View>
-          </View>
           <TextInput
             autoCapitalize="words"
             editable={!isSubmitting}
@@ -116,11 +69,6 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
 }
 
 const styles = StyleSheet.create({
-  body: {
-    color: colors.muted,
-    fontSize: 16,
-    lineHeight: 24,
-  },
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -159,34 +107,5 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 36,
     fontWeight: '800',
-  },
-  photo: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
-    borderRadius: 36,
-    borderWidth: 1,
-    height: 72,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 72,
-  },
-  photoCopy: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  photoImage: {
-    height: '100%',
-    width: '100%',
-  },
-  photoInitial: {
-    color: colors.accent,
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  photoRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
   },
 });
