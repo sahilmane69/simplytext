@@ -7,10 +7,11 @@ import { saveProfile } from '../services';
 
 type ProfileSetupScreenProps = {
   onComplete: () => Promise<void>;
+  phone?: string | null;
   userId?: string;
 };
 
-export function ProfileSetupScreen({ onComplete, userId }: ProfileSetupScreenProps) {
+export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupScreenProps) {
   const [name, setName] = useState('');
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -58,7 +59,7 @@ export function ProfileSetupScreen({ onComplete, userId }: ProfileSetupScreenPro
     setErrorMessage('');
 
     try {
-      await saveProfile({ image, name, userId });
+      await saveProfile({ image, name, phone, userId });
       await onComplete();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save profile');

@@ -7,18 +7,20 @@ export type Profile = {
   avatar_url: string | null;
   id: string;
   name: string;
+  phone: string | null;
 };
 
 type SaveProfileInput = {
   image: ImagePickerAsset | null;
   name: string;
+  phone?: string | null;
   userId: string;
 };
 
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,avatar_url')
+    .select('id,name,avatar_url,phone')
     .eq('id', userId)
     .maybeSingle<Profile>();
 
@@ -29,7 +31,7 @@ export async function getProfile(userId: string) {
   return data;
 }
 
-export async function saveProfile({ image, name, userId }: SaveProfileInput) {
+export async function saveProfile({ image, name, phone, userId }: SaveProfileInput) {
   const avatarUrl = image ? await uploadProfilePhoto(userId, image) : null;
 
   const { data, error } = await supabase
@@ -39,11 +41,12 @@ export async function saveProfile({ image, name, userId }: SaveProfileInput) {
         avatar_url: avatarUrl,
         id: userId,
         name: name.trim(),
+        phone,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },
     )
-    .select('id,name,avatar_url')
+    .select('id,name,avatar_url,phone')
     .single<Profile>();
 
   if (error) {

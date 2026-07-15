@@ -78,6 +78,7 @@ export function RootNavigator() {
             await auth.refreshProfile();
             setRouteName('Home');
           }}
+          phone={auth.session?.user.phone}
           userId={auth.session?.user.id}
         />
       )}
