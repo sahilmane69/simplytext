@@ -15,8 +15,13 @@ import {
   MatchedContact,
   requestContactsPermission,
 } from '../services';
+import { Profile } from '../services/profiles';
 
-export function HomeScreen() {
+type HomeScreenProps = {
+  onOpenChat: (profile: Profile) => void;
+};
+
+export function HomeScreen({ onOpenChat }: HomeScreenProps) {
   const [contacts, setContacts] = useState<MatchedContact[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [hasPermission, setHasPermission] = useState(false);
@@ -129,6 +134,7 @@ export function HomeScreen() {
               emptyText={
                 searchQuery ? 'No registered contacts match your search.' : 'No contacts are on SimplyText yet.'
               }
+              onOpenChat={onOpenChat}
               title="On SimplyText"
             />
             <ContactSection
@@ -151,19 +157,26 @@ export function HomeScreen() {
 type ContactSectionProps = {
   contacts: MatchedContact[];
   emptyText: string;
+  onOpenChat?: (profile: Profile) => void;
   showInvite?: boolean;
   title: string;
 };
 
-function ContactSection({ contacts, emptyText, showInvite = false, title }: ContactSectionProps) {
+function ContactSection({ contacts, emptyText, onOpenChat, showInvite = false, title }: ContactSectionProps) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.list}>
         {contacts.length === 0 ? <Text style={styles.emptyText}>{emptyText}</Text> : null}
         {contacts.map((contact, index) => (
-          <View
+          <Pressable
             key={contact.id}
+            disabled={!contact.profile || showInvite}
+            onPress={() => {
+              if (contact.profile) {
+                onOpenChat?.(contact.profile);
+              }
+            }}
             style={[styles.contactRow, index < contacts.length - 1 && styles.contactRowBorder]}
           >
             <View style={styles.avatar}>
@@ -182,7 +195,7 @@ function ContactSection({ contacts, emptyText, showInvite = false, title }: Cont
                 <Text style={styles.inviteText}>Invite</Text>
               </Pressable>
             ) : null}
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>

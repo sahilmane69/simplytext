@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import {
+  ChatScreen,
   HomeScreen,
   LoginScreen,
   ProfileSetupScreen,
@@ -10,6 +11,7 @@ import {
 import { colors } from '../constants';
 import { useAuth } from '../hooks';
 import { AppRouteName } from '../types';
+import { Profile } from '../services/profiles';
 
 const theme = {
   dark: true,
@@ -43,6 +45,7 @@ const theme = {
 
 export function RootNavigator() {
   const [routeName, setRouteName] = useState<AppRouteName>('Splash');
+  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const auth = useAuth();
 
   useEffect(() => {
@@ -52,14 +55,19 @@ export function RootNavigator() {
     }
 
     if (auth.status === 'authenticated') {
+      if (routeName === 'Chat' && selectedProfile) {
+        return;
+      }
+
       setRouteName(auth.hasProfile ? 'Home' : 'ProfileSetup');
       return;
     }
 
-    if (routeName === 'Home' || routeName === 'ProfileSetup') {
+    if (routeName === 'Home' || routeName === 'ProfileSetup' || routeName === 'Chat') {
+      setSelectedProfile(null);
       setRouteName('Login');
     }
-  }, [auth.hasProfile, auth.status, routeName]);
+  }, [auth.hasProfile, auth.status, routeName, selectedProfile]);
 
   const completeLogin = () => {
     setRouteName(auth.hasProfile ? 'Home' : 'ProfileSetup');
@@ -82,7 +90,24 @@ export function RootNavigator() {
           userId={auth.session?.user.id}
         />
       )}
-      {routeName === 'Home' && <HomeScreen />}
+      {routeName === 'Home' && (
+        <HomeScreen
+          onOpenChat={(profile) => {
+            setSelectedProfile(profile);
+            setRouteName('Chat');
+          }}
+        />
+      )}
+      {routeName === 'Chat' && auth.session?.user.id && selectedProfile && (
+        <ChatScreen
+          currentUserId={auth.session.user.id}
+          onBack={() => {
+            setSelectedProfile(null);
+            setRouteName('Home');
+          }}
+          profile={selectedProfile}
+        />
+      )}
     </NavigationContainer>
   );
 }
