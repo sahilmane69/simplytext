@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton, Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
 import { saveProfile } from '../services';
@@ -11,9 +12,33 @@ type ProfileSetupScreenProps = {
 };
 
 export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupScreenProps) {
-  const [name, setName] = useState('');
+  const [bio, setBio] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [username, setUsername] = useState('');
+
+  const pickImage = async () => {
+    setErrorMessage('');
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setErrorMessage('Photo library permission is required');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      mediaTypes: ['images'],
+      quality: 0.85,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0]);
+    }
+  };
 
   const submitProfile = async () => {
     if (!userId) {
@@ -21,8 +46,13 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
       return;
     }
 
-    if (!name.trim()) {
-      setErrorMessage('Enter your name');
+    if (!username.trim()) {
+      setErrorMessage('Enter your username');
+      return;
+    }
+
+    if (!image) {
+      setErrorMessage('Choose a profile photo');
       return;
     }
 
@@ -30,7 +60,7 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
     setErrorMessage('');
 
     try {
-      await saveProfile({ name, phone, userId });
+      await saveProfile({ bio, image, phone, username, userId });
       await onComplete();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to save profile');
@@ -45,15 +75,42 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
         <Text style={styles.kicker}>Profile</Text>
         <Text style={styles.title}>Set up your identity</Text>
         <View style={styles.card}>
+          <View style={styles.photoRow}>
+            <View style={styles.photo}>
+              {image ? (
+                <Image source={{ uri: image.uri }} style={styles.photoImage} />
+              ) : (
+                <Text style={styles.photoInitial}>{username.trim().charAt(0).toUpperCase() || 'S'}</Text>
+              )}
+            </View>
+            <View style={styles.photoCopy}>
+              <Text style={styles.body}>Profile photo</Text>
+              <AppButton
+                disabled={isSubmitting}
+                label={image ? 'Change photo' : 'Choose photo'}
+                onPress={pickImage}
+                variant="secondary"
+              />
+            </View>
+          </View>
           <TextInput
-            autoCapitalize="words"
+            autoCapitalize="none"
             editable={!isSubmitting}
-            onChangeText={setName}
-            placeholder="Name"
+            onChangeText={setUsername}
+            placeholder="Username"
             placeholderTextColor={colors.muted}
             style={styles.input}
-            textContentType="name"
-            value={name}
+            textContentType="username"
+            value={username}
+          />
+          <TextInput
+            editable={!isSubmitting}
+            multiline
+            onChangeText={setBio}
+            placeholder="Bio (optional)"
+            placeholderTextColor={colors.muted}
+            style={[styles.input, styles.bioInput]}
+            value={bio}
           />
         </View>
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
@@ -69,6 +126,16 @@ export function ProfileSetupScreen({ onComplete, phone, userId }: ProfileSetupSc
 }
 
 const styles = StyleSheet.create({
+  bioInput: {
+    minHeight: 96,
+    paddingTop: spacing.md,
+    textAlignVertical: 'top',
+  },
+  body: {
+    color: colors.muted,
+    fontSize: 16,
+    lineHeight: 24,
+  },
   card: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -107,5 +174,34 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 36,
     fontWeight: '800',
+  },
+  photo: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.border,
+    borderRadius: 36,
+    borderWidth: 1,
+    height: 72,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 72,
+  },
+  photoCopy: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  photoImage: {
+    height: '100%',
+    width: '100%',
+  },
+  photoInitial: {
+    color: colors.accent,
+    fontSize: 26,
+    fontWeight: '800',
+  },
+  photoRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
   },
 });
