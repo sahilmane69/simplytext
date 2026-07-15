@@ -21,41 +21,51 @@ import {
   getConversationMessages,
   getOrCreateDirectConversation,
   markConversationSeen,
+  removePresenceChannel,
   sendMessagesCleared,
   sendTextMessage,
   sendTyping,
+  subscribeToOnlineUsers,
   subscribeToMessages,
   subscribeToTyping,
   unsubscribe,
 } from '../services';
 
 type ChatScreenProps = {
+  currentProfile: {
+    show_typing_indicator: boolean;
+  } | null;
   currentUserId: string;
   onBack: () => void;
   target: ChatTarget;
 };
 
-export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
+export function ChatScreen({ currentProfile, currentUserId, onBack, target }: ChatScreenProps) {
   const [conversationId, setConversationId] = useState('');
   const [draft, setDraft] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const conversationIdRef = useRef('');
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const chatTitle = target.type === 'direct' ? target.profile.name : target.conversation.name ?? 'Group';
-  const chatSubtitle =
-    target.type === 'direct'
-      ? isTyping
-        ? 'Typing'
-        : 'On SimplyText'
-      : isTyping
-        ? 'Typing'
-        : `${target.memberCount} members`;
+  const isDirectChat = target.type === 'direct';
+  const otherProfile = isDirectChat ? target.profile : null;
+  const isOtherUserOnline = Boolean(
+    otherProfile?.show_online_status && onlineUserIds.has(otherProfile.id),
+  );
+  const canShowTyping = Boolean(otherProfile?.show_typing_indicator ?? target.type === 'group');
+  const chatSubtitle = getChatSubtitle({
+    canShowTyping,
+    isOtherUserOnline,
+    isTyping,
+    target,
+  });
   const chatInitial = chatTitle.charAt(0).toUpperCase();
 
   const clearConversationMessages = useCallback(async (silent = false) => {
@@ -168,6 +178,18 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
   }, [conversationId, currentUserId]);
 
   useEffect(() => {
+    if (!isDirectChat) {
+      return undefined;
+    }
+
+    const channel = subscribeToOnlineUsers(setOnlineUserIds);
+
+    return () => {
+      removePresenceChannel(channel);
+    };
+  }, [isDirectChat]);
+
+  useEffect(() => {
     return () => {
       clearConversationMessages(true);
     };
@@ -202,7 +224,9 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
     const body = draft;
     setDraft('');
     setIsSending(true);
-    sendTyping(typingChannelRef.current, currentUserId, false);
+    if (canSendTyping(currentProfile)) {
+      sendTyping(typingChannelRef.current, currentUserId, false);
+    }
 
     try {
       await sendTextMessage(conversationId, currentUserId, body);
@@ -216,7 +240,9 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
 
   const updateDraft = (value: string) => {
     setDraft(value);
-    sendTyping(typingChannelRef.current, currentUserId, value.trim().length > 0);
+    if (canSendTyping(currentProfile)) {
+      sendTyping(typingChannelRef.current, currentUserId, value.trim().length > 0);
+    }
   };
 
   const leaveChat = async () => {
@@ -334,6 +360,68 @@ function formatMessageTime(value: string) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value));
+}
+
+function canSendTyping(currentProfile: ChatScreenProps['currentProfile']) {
+  return currentProfile?.show_typing_indicator ?? true;
+}
+
+function getChatSubtitle({
+  canShowTyping,
+  isOtherUserOnline,
+  isTyping,
+  target,
+}: {
+  canShowTyping: boolean;
+  isOtherUserOnline: boolean;
+  isTyping: boolean;
+  target: ChatTarget;
+}) {
+  if (target.type === 'group') {
+    return isTyping ? 'Typing...' : `${target.memberCount} members`;
+  }
+
+  if (canShowTyping && isTyping) {
+    return 'Typing...';
+  }
+
+  if (isOtherUserOnline) {
+    return 'Online';
+  }
+
+  if (target.profile.show_last_seen && target.profile.last_seen_at) {
+    return formatLastSeen(target.profile.last_seen_at);
+  }
+
+  return 'On SimplyText';
+}
+
+function formatLastSeen(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const time = new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+
+  if (targetDay.getTime() === today.getTime()) {
+    return `Last seen today at ${time}`;
+  }
+
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  if (targetDay.getTime() === yesterday.getTime()) {
+    return `Last seen yesterday at ${time}`;
+  }
+
+  const day = new Intl.DateTimeFormat(undefined, { day: 'numeric' }).format(date);
+  const month = new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
+  const year = new Intl.DateTimeFormat(undefined, { year: 'numeric' }).format(date);
+
+  return `Last seen on ${day} ${month} ${year}`;
 }
 
 const styles = StyleSheet.create({

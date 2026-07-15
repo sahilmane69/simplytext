@@ -1,13 +1,17 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppButton, Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
+import { Profile, updatePresencePrivacy } from '../services';
 
 type SettingsScreenProps = {
+  currentUserId: string;
   onBack: () => void;
   onLogout: () => void;
   onOpenPrivacyPolicy: () => void;
   onOpenTerms: () => void;
+  onProfileUpdated: () => Promise<void>;
+  profile: Profile;
 };
 
 type SettingsValue = Record<string, boolean>;
@@ -19,19 +23,68 @@ const initialSettings: SettingsValue = {
   messageNotifications: true,
   profileVisibility: true,
   pushNotifications: true,
+  showLastSeen: true,
+  showOnlineStatus: true,
+  showTypingIndicator: true,
   sound: true,
   vibration: true,
 };
 
-export function SettingsScreen({ onBack, onLogout, onOpenPrivacyPolicy, onOpenTerms }: SettingsScreenProps) {
+export function SettingsScreen({
+  currentUserId,
+  onBack,
+  onLogout,
+  onOpenPrivacyPolicy,
+  onOpenTerms,
+  onProfileUpdated,
+  profile,
+}: SettingsScreenProps) {
   const [cacheCleared, setCacheCleared] = useState(false);
-  const [settings, setSettings] = useState(initialSettings);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+  const [settings, setSettings] = useState<SettingsValue>({
+    ...initialSettings,
+    showLastSeen: profile.show_last_seen,
+    showOnlineStatus: profile.show_online_status,
+    showTypingIndicator: profile.show_typing_indicator,
+  });
+
+  useEffect(() => {
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      showLastSeen: profile.show_last_seen,
+      showOnlineStatus: profile.show_online_status,
+      showTypingIndicator: profile.show_typing_indicator,
+    }));
+  }, [profile]);
 
   const toggle = (key: string) => {
     setSettings((currentSettings) => ({
       ...currentSettings,
       [key]: !currentSettings[key],
     }));
+  };
+
+  const updatePrivacySetting = async (key: 'showLastSeen' | 'showOnlineStatus' | 'showTypingIndicator') => {
+    const nextSettings = {
+      ...settings,
+      [key]: !settings[key],
+    };
+
+    setSettings(nextSettings);
+    setIsSavingPrivacy(true);
+
+    try {
+      await updatePresencePrivacy(currentUserId, {
+        show_last_seen: nextSettings.showLastSeen,
+        show_online_status: nextSettings.showOnlineStatus,
+        show_typing_indicator: nextSettings.showTypingIndicator,
+      });
+      await onProfileUpdated();
+    } catch {
+      setSettings(settings);
+    } finally {
+      setIsSavingPrivacy(false);
+    }
   };
 
   return (
@@ -56,6 +109,24 @@ export function SettingsScreen({ onBack, onLogout, onOpenPrivacyPolicy, onOpenTe
         <SettingsSection title="Privacy">
           <SettingsToggle label="Contacts Permission" onPress={() => toggle('contactsPermission')} value={settings.contactsPermission} />
           <SettingsToggle label="Profile Visibility" onPress={() => toggle('profileVisibility')} value={settings.profileVisibility} />
+          <SettingsToggle
+            disabled={isSavingPrivacy}
+            label="Show Last Seen"
+            onPress={() => updatePrivacySetting('showLastSeen')}
+            value={settings.showLastSeen}
+          />
+          <SettingsToggle
+            disabled={isSavingPrivacy}
+            label="Show Online Status"
+            onPress={() => updatePrivacySetting('showOnlineStatus')}
+            value={settings.showOnlineStatus}
+          />
+          <SettingsToggle
+            disabled={isSavingPrivacy}
+            label="Show Typing Indicator"
+            onPress={() => updatePrivacySetting('showTypingIndicator')}
+            value={settings.showTypingIndicator}
+          />
           <SettingsRow label="Blocked Users" value="Coming soon" />
         </SettingsSection>
 

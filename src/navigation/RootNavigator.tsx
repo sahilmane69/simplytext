@@ -14,7 +14,7 @@ import {
   TermsScreen,
 } from '../screens';
 import { colors } from '../constants';
-import { useAuth } from '../hooks';
+import { useAuth, useUserPresence } from '../hooks';
 import { AppRouteName } from '../types';
 import { ChatTarget } from '../services';
 
@@ -53,6 +53,7 @@ export function RootNavigator() {
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [legalDocument, setLegalDocument] = useState<'privacy' | 'terms'>('terms');
   const auth = useAuth();
+  useUserPresence(auth.session?.user.id);
 
   useEffect(() => {
     if (auth.status === 'loading') {
@@ -136,8 +137,9 @@ export function RootNavigator() {
           profile={auth.profile}
         />
       )}
-      {routeName === 'Settings' && (
+      {routeName === 'Settings' && auth.session?.user.id && auth.profile && (
         <SettingsScreen
+          currentUserId={auth.session.user.id}
           onBack={() => setRouteName(auth.profile ? 'Profile' : 'Home')}
           onLogout={auth.logout}
           onOpenPrivacyPolicy={() => {
@@ -148,6 +150,8 @@ export function RootNavigator() {
             setLegalDocument('terms');
             setRouteName('Legal');
           }}
+          onProfileUpdated={auth.refreshProfile}
+          profile={auth.profile}
         />
       )}
       {routeName === 'Legal' && (
@@ -165,6 +169,7 @@ export function RootNavigator() {
       )}
       {routeName === 'Chat' && auth.session?.user.id && chatTarget && (
         <ChatScreen
+          currentProfile={auth.profile}
           currentUserId={auth.session.user.id}
           onBack={() => {
             setChatTarget(null);

@@ -63,6 +63,11 @@ export function ProfileScreen({ onBack, onOpenSettings, onSaved, phone, profile 
         currentAvatarUrl: profile.avatar_url,
         image: avatar,
         phone,
+        privacy: {
+          show_last_seen: profile.show_last_seen,
+          show_online_status: profile.show_online_status,
+          show_typing_indicator: profile.show_typing_indicator,
+        },
         username,
         userId: profile.id,
       });

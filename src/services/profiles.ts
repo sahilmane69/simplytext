@@ -7,8 +7,12 @@ export type Profile = {
   avatar_url: string | null;
   bio: string | null;
   id: string;
+  last_seen_at: string | null;
   name: string;
   phone: string | null;
+  show_last_seen: boolean;
+  show_online_status: boolean;
+  show_typing_indicator: boolean;
   username: string;
 };
 
@@ -17,6 +21,7 @@ type SaveProfileInput = {
   currentAvatarUrl?: string | null;
   image: ImagePickerAsset | null;
   phone?: string | null;
+  privacy?: Partial<Pick<Profile, 'show_last_seen' | 'show_online_status' | 'show_typing_indicator'>>;
   username: string;
   userId: string;
 };
@@ -24,7 +29,7 @@ type SaveProfileInput = {
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id,name,username,bio,avatar_url,phone')
+    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
     .eq('id', userId)
     .maybeSingle<Profile>();
 
@@ -35,7 +40,15 @@ export async function getProfile(userId: string) {
   return data;
 }
 
-export async function saveProfile({ bio, currentAvatarUrl, image, phone, username, userId }: SaveProfileInput) {
+export async function saveProfile({
+  bio,
+  currentAvatarUrl,
+  image,
+  phone,
+  privacy,
+  username,
+  userId,
+}: SaveProfileInput) {
   const trimmedUsername = username.trim();
   const avatarUrl = image ? await uploadProfilePhoto(userId, image) : currentAvatarUrl ?? null;
 
@@ -48,12 +61,50 @@ export async function saveProfile({ bio, currentAvatarUrl, image, phone, usernam
         id: userId,
         name: trimmedUsername,
         phone,
+        show_last_seen: privacy?.show_last_seen ?? true,
+        show_online_status: privacy?.show_online_status ?? true,
+        show_typing_indicator: privacy?.show_typing_indicator ?? true,
         username: trimmedUsername,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },
     )
-    .select('id,name,username,bio,avatar_url,phone')
+    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
+    .single<Profile>();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateLastSeen(userId: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function updatePresencePrivacy(
+  userId: string,
+  settings: Pick<Profile, 'show_last_seen' | 'show_online_status' | 'show_typing_indicator'>,
+) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      ...settings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select('id,name,username,bio,avatar_url,phone,last_seen_at,show_last_seen,show_online_status,show_typing_indicator')
     .single<Profile>();
 
   if (error) {
