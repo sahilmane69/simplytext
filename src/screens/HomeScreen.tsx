@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { AppButton, Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
 import {
@@ -13,6 +21,7 @@ export function HomeScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [hasPermission, setHasPermission] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadContacts = useCallback(async () => {
     setIsLoading(true);
@@ -40,22 +49,54 @@ export function HomeScreen() {
     loadContacts();
   }, [loadContacts]);
 
+  const filteredContacts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return contacts;
+    }
+
+    return contacts.filter((contact) => {
+      const name = (contact.profile?.name ?? contact.name).toLowerCase();
+      const phone = contact.phoneNumbers.join(' ').toLowerCase();
+
+      return name.includes(query) || phone.includes(query);
+    });
+  }, [contacts, searchQuery]);
+
   const onSimplyText = useMemo(
-    () => contacts.filter((contact) => Boolean(contact.profile)),
-    [contacts],
+    () => filteredContacts.filter((contact) => Boolean(contact.profile)),
+    [filteredContacts],
   );
   const inviteContacts = useMemo(
-    () => contacts.filter((contact) => !contact.profile),
-    [contacts],
+    () => filteredContacts.filter((contact) => !contact.profile),
+    [filteredContacts],
   );
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.eyebrow}>Contacts</Text>
-          <Text style={styles.title}>SimplyText</Text>
-          <Text style={styles.subtitle}>Find people you know. Chat stays off until messaging is ready.</Text>
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.eyebrow}>Contacts</Text>
+            <Text style={styles.title}>SimplyText</Text>
+          </View>
+          <Pressable accessibilityLabel="Open profile" accessibilityRole="button" style={styles.profileButton}>
+            <Text style={styles.profileButtonText}>P</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>Search</Text>
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            onChangeText={setSearchQuery}
+            placeholder="Name or phone"
+            placeholderTextColor={colors.muted}
+            style={styles.searchInput}
+            value={searchQuery}
+          />
         </View>
 
         {isLoading ? (
@@ -83,11 +124,26 @@ export function HomeScreen() {
 
         {!isLoading && hasPermission && !errorMessage ? (
           <>
-            <ContactSection contacts={onSimplyText} emptyText="No contacts are on SimplyText yet." title="On SimplyText" />
-            <ContactSection contacts={inviteContacts} emptyText="No contacts to invite." showInvite title="Invite" />
+            <ContactSection
+              contacts={onSimplyText}
+              emptyText={
+                searchQuery ? 'No registered contacts match your search.' : 'No contacts are on SimplyText yet.'
+              }
+              title="On SimplyText"
+            />
+            <ContactSection
+              contacts={inviteContacts}
+              emptyText={searchQuery ? 'No invite contacts match your search.' : 'No contacts to invite.'}
+              showInvite
+              title="Invite"
+            />
           </>
         ) : null}
       </ScrollView>
+
+      <Pressable accessibilityLabel="Create group" accessibilityRole="button" style={styles.groupButton}>
+        <Text style={styles.groupButtonText}>+</Text>
+      </Pressable>
     </Screen>
   );
 }
@@ -105,8 +161,11 @@ function ContactSection({ contacts, emptyText, showInvite = false, title }: Cont
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.list}>
         {contacts.length === 0 ? <Text style={styles.emptyText}>{emptyText}</Text> : null}
-        {contacts.map((contact) => (
-          <View key={contact.id} style={styles.contactRow}>
+        {contacts.map((contact, index) => (
+          <View
+            key={contact.id}
+            style={[styles.contactRow, index < contacts.length - 1 && styles.contactRowBorder]}
+          >
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{contact.name.charAt(0).toUpperCase()}</Text>
             </View>
@@ -133,8 +192,8 @@ function ContactSection({ contacts, emptyText, showInvite = false, title }: Cont
 const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
+    backgroundColor: '#111111',
+    borderColor: '#303030',
     borderRadius: 22,
     borderWidth: 1,
     height: 44,
@@ -142,7 +201,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   avatarText: {
-    color: colors.accent,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -154,7 +213,7 @@ const styles = StyleSheet.create({
   contactName: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   contactPhone: {
     color: colors.muted,
@@ -164,11 +223,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.md,
-    minHeight: 64,
+    minHeight: 68,
+    paddingVertical: spacing.sm,
+  },
+  contactRowBorder: {
+    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   content: {
-    gap: spacing.xl,
-    paddingBottom: spacing.xl,
+    gap: spacing.lg,
+    paddingBottom: 112,
   },
   eyebrow: {
     color: colors.accent,
@@ -177,10 +241,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     textTransform: 'uppercase',
   },
-  header: {
-    gap: spacing.sm,
-    paddingTop: spacing.xl,
-  },
   emptyText: {
     color: colors.muted,
     fontSize: 15,
@@ -188,8 +248,8 @@ const styles = StyleSheet.create({
   },
   inviteButton: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.border,
+    backgroundColor: 'transparent',
+    borderColor: '#3A3A3A',
     borderRadius: radius.md,
     borderWidth: 1,
     minHeight: 38,
@@ -202,11 +262,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   list: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
+    backgroundColor: '#141414',
+    borderColor: '#252525',
+    borderRadius: radius.md,
     borderWidth: 1,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  groupButton: {
+    alignItems: 'center',
+    backgroundColor: colors.text,
+    borderRadius: 30,
+    bottom: spacing.lg,
+    height: 60,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.lg,
+    shadowColor: '#000000',
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    width: 60,
+  },
+  groupButtonText: {
+    color: colors.background,
+    fontSize: 30,
+    fontWeight: '500',
+    lineHeight: 34,
   },
   panelText: {
     color: colors.muted,
@@ -219,12 +300,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   section: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0,
+  },
+  searchBar: {
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderColor: '#252525',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: spacing.md,
+  },
+  searchIcon: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  searchInput: {
+    color: colors.text,
+    flex: 1,
+    fontSize: 16,
+    minHeight: 48,
   },
   statePanel: {
     alignItems: 'flex-start',
@@ -235,14 +339,30 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.lg,
   },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 17,
-    lineHeight: 25,
-  },
   title: {
     color: colors.text,
-    fontSize: 38,
+    fontSize: 34,
+    fontWeight: '800',
+  },
+  topBar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: spacing.xl,
+  },
+  profileButton: {
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderColor: '#303030',
+    borderRadius: 24,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  profileButtonText: {
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '800',
   },
 });
