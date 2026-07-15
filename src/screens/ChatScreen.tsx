@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -57,6 +58,7 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
         ? 'Typing'
         : `${target.memberCount} members`;
   const chatInitial = chatTitle.charAt(0).toUpperCase();
+  const chatPhotoUrl = target.type === 'group' ? target.conversation.photo_url : null;
 
   const clearConversationMessages = useCallback(async (silent = false) => {
     const nextConversationId = conversationIdRef.current;
@@ -242,7 +244,11 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
           </Pressable>
           <View style={styles.headerIdentity}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{chatInitial}</Text>
+              {chatPhotoUrl ? (
+                <Image source={{ uri: chatPhotoUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{chatInitial}</Text>
+              )}
             </View>
             <View style={styles.headerCopy}>
               <Text numberOfLines={1} style={styles.title}>
@@ -352,6 +358,10 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     fontWeight: '800',
+  },
+  avatarImage: {
+    height: '100%',
+    width: '100%',
   },
   backButton: {
     alignItems: 'center',

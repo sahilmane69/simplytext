@@ -18,10 +18,11 @@ import {
 import { Profile } from '../services/profiles';
 
 type HomeScreenProps = {
+  onCreateGroup: () => void;
   onOpenChat: (profile: Profile) => void;
 };
 
-export function HomeScreen({ onOpenChat }: HomeScreenProps) {
+export function HomeScreen({ onCreateGroup, onOpenChat }: HomeScreenProps) {
   const [contacts, setContacts] = useState<MatchedContact[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const [hasPermission, setHasPermission] = useState(false);
@@ -147,7 +148,12 @@ export function HomeScreen({ onOpenChat }: HomeScreenProps) {
         ) : null}
       </ScrollView>
 
-      <Pressable accessibilityLabel="Create group" accessibilityRole="button" style={styles.groupButton}>
+      <Pressable
+        accessibilityLabel="Create group"
+        accessibilityRole="button"
+        onPress={onCreateGroup}
+        style={styles.groupButton}
+      >
         <Text style={styles.groupButtonText}>+</Text>
       </Pressable>
     </Screen>

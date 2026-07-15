@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import {
   ChatScreen,
+  GroupSetupScreen,
   HomeScreen,
   LoginScreen,
   ProfileSetupScreen,
@@ -11,7 +12,7 @@ import {
 import { colors } from '../constants';
 import { useAuth } from '../hooks';
 import { AppRouteName } from '../types';
-import { Profile } from '../services/profiles';
+import { ChatTarget } from '../services';
 
 const theme = {
   dark: true,
@@ -45,7 +46,7 @@ const theme = {
 
 export function RootNavigator() {
   const [routeName, setRouteName] = useState<AppRouteName>('Splash');
-  const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const auth = useAuth();
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function RootNavigator() {
     }
 
     if (auth.status === 'authenticated') {
-      if (routeName === 'Chat' && selectedProfile) {
+      if ((routeName === 'Chat' && chatTarget) || routeName === 'GroupSetup') {
         return;
       }
 
@@ -63,11 +64,16 @@ export function RootNavigator() {
       return;
     }
 
-    if (routeName === 'Home' || routeName === 'ProfileSetup' || routeName === 'Chat') {
-      setSelectedProfile(null);
+    if (
+      routeName === 'Home' ||
+      routeName === 'ProfileSetup' ||
+      routeName === 'GroupSetup' ||
+      routeName === 'Chat'
+    ) {
+      setChatTarget(null);
       setRouteName('Login');
     }
-  }, [auth.hasProfile, auth.status, routeName, selectedProfile]);
+  }, [auth.hasProfile, auth.status, chatTarget, routeName]);
 
   const completeLogin = () => {
     setRouteName(auth.hasProfile ? 'Home' : 'ProfileSetup');
@@ -92,20 +98,34 @@ export function RootNavigator() {
       )}
       {routeName === 'Home' && (
         <HomeScreen
+          onCreateGroup={() => setRouteName('GroupSetup')}
           onOpenChat={(profile) => {
-            setSelectedProfile(profile);
+            setChatTarget({
+              profile,
+              type: 'direct',
+            });
             setRouteName('Chat');
           }}
         />
       )}
-      {routeName === 'Chat' && auth.session?.user.id && selectedProfile && (
+      {routeName === 'GroupSetup' && auth.session?.user.id && (
+        <GroupSetupScreen
+          currentUserId={auth.session.user.id}
+          onBack={() => setRouteName('Home')}
+          onCreated={(target) => {
+            setChatTarget(target);
+            setRouteName('Chat');
+          }}
+        />
+      )}
+      {routeName === 'Chat' && auth.session?.user.id && chatTarget && (
         <ChatScreen
           currentUserId={auth.session.user.id}
           onBack={() => {
-            setSelectedProfile(null);
+            setChatTarget(null);
             setRouteName('Home');
           }}
-          profile={selectedProfile}
+          target={chatTarget}
         />
       )}
     </NavigationContainer>

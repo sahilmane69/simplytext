@@ -1,1 +1,1 @@
-export type AppRouteName = 'Splash' | 'Terms' | 'Login' | 'ProfileSetup' | 'Home' | 'Chat';
+export type AppRouteName = 'Splash' | 'Terms' | 'Login' | 'ProfileSetup' | 'Home' | 'GroupSetup' | 'Chat';
