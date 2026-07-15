@@ -24,6 +24,7 @@ const initialSettings: SettingsValue = {
 };
 
 export function SettingsScreen({ onBack, onLogout, onOpenPrivacyPolicy, onOpenTerms }: SettingsScreenProps) {
+  const [cacheCleared, setCacheCleared] = useState(false);
   const [settings, setSettings] = useState(initialSettings);
 
   const toggle = (key: string) => {
@@ -64,7 +65,11 @@ export function SettingsScreen({ onBack, onLogout, onOpenPrivacyPolicy, onOpenTe
         </SettingsSection>
 
         <SettingsSection title="Storage">
-          <SettingsAction label="Clear Local Cache" onPress={() => undefined} />
+          <SettingsAction
+            label="Clear Local Cache"
+            onPress={() => setCacheCleared(true)}
+            value={cacheCleared ? 'Cleared' : 'Clear'}
+          />
         </SettingsSection>
 
         <SettingsSection title="About">
@@ -113,13 +118,14 @@ function SettingsRow({ label, value }: SettingsRowProps) {
 type SettingsActionProps = {
   label: string;
   onPress: () => void;
+  value?: string;
 };
 
-function SettingsAction({ label, onPress }: SettingsActionProps) {
+function SettingsAction({ label, onPress, value = 'Open' }: SettingsActionProps) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>Open</Text>
+      <Text style={styles.rowValue}>{value}</Text>
     </Pressable>
   );
 }

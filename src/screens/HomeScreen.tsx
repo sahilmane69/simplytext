@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,12 +15,14 @@ import { useContacts } from '../hooks';
 import { MatchedContact, Profile } from '../services';
 
 type HomeScreenProps = {
+  avatarUrl?: string | null;
   onCreateGroup: () => void;
   onOpenChat: (profile: Profile) => void;
   onOpenProfile: () => void;
+  profileName?: string;
 };
 
-export function HomeScreen({ onCreateGroup, onOpenChat, onOpenProfile }: HomeScreenProps) {
+export function HomeScreen({ avatarUrl, onCreateGroup, onOpenChat, onOpenProfile, profileName }: HomeScreenProps) {
   const { contacts, errorMessage, hasPermission, isLoading, loadContacts } = useContacts();
   const [searchQuery, setSearchQuery] = useState('');
   const filteredContacts = useFilteredContacts(contacts, searchQuery);
@@ -46,7 +49,11 @@ export function HomeScreen({ onCreateGroup, onOpenChat, onOpenProfile }: HomeScr
             onPress={onOpenProfile}
             style={styles.profileButton}
           >
-            <Text style={styles.profileButtonText}>P</Text>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.profileImage} />
+            ) : (
+              <Text style={styles.profileButtonText}>{profileName?.charAt(0).toUpperCase() ?? 'P'}</Text>
+            )}
           </Pressable>
         </View>
 
@@ -246,12 +253,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 48,
     justifyContent: 'center',
+    overflow: 'hidden',
     width: 48,
   },
   profileButtonText: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '800',
+  },
+  profileImage: {
+    height: '100%',
+    width: '100%',
   },
   searchBar: {
     alignItems: 'center',

@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { BackHandler } from 'react-native';
 import {
   ChatScreen,
   GroupSetupScreen,
   HomeScreen,
+  LegalScreen,
   LoginScreen,
+  ProfileScreen,
   ProfileSetupScreen,
+  SettingsScreen,
   SplashScreen,
   TermsScreen,
 } from '../screens';
@@ -47,6 +51,7 @@ const theme = {
 export function RootNavigator() {
   const [routeName, setRouteName] = useState<AppRouteName>('Splash');
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
+  const [legalDocument, setLegalDocument] = useState<'privacy' | 'terms'>('terms');
   const auth = useAuth();
 
   useEffect(() => {
@@ -56,7 +61,13 @@ export function RootNavigator() {
     }
 
     if (auth.status === 'authenticated') {
-      if ((routeName === 'Chat' && chatTarget) || routeName === 'GroupSetup') {
+      if (
+        (routeName === 'Chat' && chatTarget) ||
+        routeName === 'GroupSetup' ||
+        routeName === 'Profile' ||
+        routeName === 'Settings' ||
+        routeName === 'Legal'
+      ) {
         return;
       }
 
@@ -67,6 +78,9 @@ export function RootNavigator() {
     if (
       routeName === 'Home' ||
       routeName === 'ProfileSetup' ||
+      routeName === 'Profile' ||
+      routeName === 'Settings' ||
+      routeName === 'Legal' ||
       routeName === 'GroupSetup' ||
       routeName === 'Chat'
     ) {
@@ -82,7 +96,9 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={theme}>
       {routeName === 'Splash' && <SplashScreen onContinue={() => setRouteName('Terms')} />}
-      {routeName === 'Terms' && <TermsScreen onAccept={() => setRouteName('Login')} />}
+      {routeName === 'Terms' && (
+        <TermsScreen onAccept={() => setRouteName('Login')} onExit={() => BackHandler.exitApp()} />
+      )}
       {routeName === 'Login' && (
         <LoginScreen onContinue={completeLogin} sendOtp={auth.sendOtp} verifyOtp={auth.verifyOtp} />
       )}
@@ -98,6 +114,7 @@ export function RootNavigator() {
       )}
       {routeName === 'Home' && (
         <HomeScreen
+          avatarUrl={auth.profile?.avatar_url}
           onCreateGroup={() => setRouteName('GroupSetup')}
           onOpenChat={(profile) => {
             setChatTarget({
@@ -106,7 +123,35 @@ export function RootNavigator() {
             });
             setRouteName('Chat');
           }}
+          onOpenProfile={() => setRouteName('Profile')}
+          profileName={auth.profile?.name}
         />
+      )}
+      {routeName === 'Profile' && auth.profile && (
+        <ProfileScreen
+          onBack={() => setRouteName('Home')}
+          onOpenSettings={() => setRouteName('Settings')}
+          onSaved={auth.refreshProfile}
+          phone={auth.session?.user.phone}
+          profile={auth.profile}
+        />
+      )}
+      {routeName === 'Settings' && (
+        <SettingsScreen
+          onBack={() => setRouteName(auth.profile ? 'Profile' : 'Home')}
+          onLogout={auth.logout}
+          onOpenPrivacyPolicy={() => {
+            setLegalDocument('privacy');
+            setRouteName('Legal');
+          }}
+          onOpenTerms={() => {
+            setLegalDocument('terms');
+            setRouteName('Legal');
+          }}
+        />
+      )}
+      {routeName === 'Legal' && (
+        <LegalScreen document={legalDocument} onBack={() => setRouteName('Settings')} />
       )}
       {routeName === 'GroupSetup' && auth.session?.user.id && (
         <GroupSetupScreen
