@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { Screen } from '../components';
+import { Avatar, Screen, StatePanel } from '../components';
 import { colors, radius, spacing } from '../constants';
 import {
   ChatTarget,
@@ -75,8 +75,6 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
       if (!silent) {
         throw new Error('Unable to clear disappearing chat');
       }
-
-      // The next chat open still fetches from Supabase; cleanup failure should not block navigation.
     }
   }, [currentUserId]);
 
@@ -241,9 +239,7 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
             <Text style={styles.backButtonText}>Back</Text>
           </Pressable>
           <View style={styles.headerIdentity}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{chatInitial}</Text>
-            </View>
+            <Avatar label={chatInitial} />
             <View style={styles.headerCopy}>
               <Text numberOfLines={1} style={styles.title}>
                 {chatTitle}
@@ -254,20 +250,23 @@ export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
         </View>
 
         {isLoading ? (
-          <View style={styles.statePanel}>
+          <StatePanel>
             <ActivityIndicator color={colors.accent} />
             <Text style={styles.stateText}>Opening chat</Text>
-          </View>
+          </StatePanel>
         ) : null}
 
         {!isLoading && errorMessage ? (
-          <View style={styles.statePanel}>
-            <Text style={styles.stateTitle}>Unable to load chat</Text>
-            <Text style={styles.stateText}>{errorMessage}</Text>
-            <Pressable accessibilityRole="button" onPress={loadConversation} style={styles.retryButton}>
-              <Text style={styles.retryText}>Try again</Text>
-            </Pressable>
-          </View>
+          <StatePanel
+            action={
+              <Pressable accessibilityRole="button" onPress={loadConversation} style={styles.retryButton}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
+            }
+            title="Unable to load chat"
+          >
+            {errorMessage}
+          </StatePanel>
         ) : null}
 
         {!isLoading && !errorMessage ? (
@@ -338,22 +337,6 @@ function formatMessageTime(value: string) {
 }
 
 const styles = StyleSheet.create({
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderColor: '#303030',
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: 44,
-  },
-  avatarText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
   backButton: {
     alignItems: 'center',
     borderColor: '#303030',
@@ -476,24 +459,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
-  statePanel: {
-    alignItems: 'flex-start',
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
   stateText: {
     color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
-  },
-  stateTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '700',
   },
   subtitle: {
     color: colors.muted,

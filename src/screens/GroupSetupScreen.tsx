@@ -1,23 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { AppButton, Screen } from '../components';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppButton, ContactRow, Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
-import {
-  ChatTarget,
-  createGroupConversation,
-  getContactsWithRegistrationStatus,
-  MatchedContact,
-  requestContactsPermission,
-} from '../services';
-import { Profile } from '../services/profiles';
+import { useContacts } from '../hooks';
+import { ChatTarget, createGroupConversation, Profile } from '../services';
 
 type GroupSetupScreenProps = {
   currentUserId: string;
@@ -26,45 +12,21 @@ type GroupSetupScreenProps = {
 };
 
 export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetupScreenProps) {
-  const [contacts, setContacts] = useState<MatchedContact[]>([]);
+  const { contacts, errorMessage: contactsError, hasPermission, isLoading } = useContacts();
   const [errorMessage, setErrorMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  const loadContacts = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const hasPermission = await requestContactsPermission();
-
-      if (!hasPermission) {
-        setContacts([]);
-        setErrorMessage('Contacts permission is required to create a group');
-        return;
-      }
-
-      const nextContacts = await getContactsWithRegistrationStatus();
-      setContacts(nextContacts.filter((contact) => Boolean(contact.profile)));
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to load contacts');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
-
+  const registeredContacts = useMemo(
+    () => contacts.filter((contact) => Boolean(contact.profile)),
+    [contacts],
+  );
   const selectedMembers = useMemo(
     () =>
-      contacts
+      registeredContacts
         .map((contact) => contact.profile)
         .filter((profile): profile is Profile => Boolean(profile && selectedIds.has(profile.id))),
-    [contacts, selectedIds],
+    [registeredContacts, selectedIds],
   );
 
   const toggleContact = (profile: Profile) => {
@@ -104,6 +66,9 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
     }
   };
 
+  const visibleError =
+    errorMessage || contactsError || (!isLoading && !hasPermission ? 'Contacts permission is required to create a group' : '');
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -135,10 +100,10 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
                 <Text style={styles.stateText}>Loading contacts</Text>
               </View>
             ) : null}
-            {!isLoading && contacts.length === 0 ? (
+            {!isLoading && registeredContacts.length === 0 ? (
               <Text style={styles.emptyText}>No registered contacts available.</Text>
             ) : null}
-            {contacts.map((contact, index) => {
+            {registeredContacts.map((contact, index) => {
               const profile = contact.profile;
 
               if (!profile) {
@@ -148,32 +113,20 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
               const isSelected = selectedIds.has(profile.id);
 
               return (
-                <Pressable
+                <ContactRow
+                  accessory={<SelectionIndicator selected={isSelected} />}
+                  isLast={index === registeredContacts.length - 1}
                   key={profile.id}
+                  name={profile.name}
                   onPress={() => toggleContact(profile)}
-                  style={[styles.contactRow, index < contacts.length - 1 && styles.contactRowBorder]}
-                >
-                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                    {isSelected ? <Text style={styles.checkboxText}>x</Text> : null}
-                  </View>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.contactCopy}>
-                    <Text numberOfLines={1} style={styles.contactName}>
-                      {profile.name}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.contactPhone}>
-                      {contact.phoneNumbers[0]}
-                    </Text>
-                  </View>
-                </Pressable>
+                  phone={contact.phoneNumbers[0]}
+                />
               );
             })}
           </View>
         </View>
 
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+        {visibleError ? <Text style={styles.errorText}>{visibleError}</Text> : null}
       </ScrollView>
 
       <AppButton
@@ -185,29 +138,22 @@ export function GroupSetupScreen({ currentUserId, onBack, onCreated }: GroupSetu
   );
 }
 
+function SelectionIndicator({ selected }: { selected: boolean }) {
+  return (
+    <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
+      {selected ? <Text style={styles.checkboxText}>x</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: '#111111',
-    borderColor: '#303030',
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
-  avatarText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
   backButton: {
     alignSelf: 'flex-start',
     borderColor: '#303030',
     borderRadius: radius.md,
     borderWidth: 1,
-    minHeight: 40,
     justifyContent: 'center',
+    minHeight: 40,
     paddingHorizontal: spacing.md,
   },
   backButtonText: {
@@ -241,31 +187,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
   },
-  contactCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0,
-  },
-  contactName: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  contactPhone: {
-    color: colors.muted,
-    fontSize: 14,
-  },
-  contactRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 68,
-    paddingVertical: spacing.sm,
-  },
-  contactRowBorder: {
-    borderBottomColor: colors.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   content: {
     gap: spacing.lg,
     paddingBottom: spacing.xl,
@@ -274,7 +195,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 15,
     lineHeight: 22,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
   },
   errorText: {
     color: colors.text,

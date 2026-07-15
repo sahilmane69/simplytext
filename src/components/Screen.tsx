@@ -12,9 +12,12 @@ export function Screen({ children }: PropsWithChildren) {
 
 const styles = StyleSheet.create({
   content: {
+    alignSelf: 'center',
     flex: 1,
     justifyContent: 'space-between',
+    maxWidth: 560,
     padding: spacing.lg,
+    width: '100%',
   },
   safeArea: {
     backgroundColor: colors.background,

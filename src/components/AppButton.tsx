@@ -4,7 +4,7 @@ import { colors, radius, spacing } from '../constants';
 type AppButtonProps = {
   disabled?: boolean;
   label: string;
-  onPress: () => void;
+  onPress: () => Promise<void> | void;
   variant?: 'primary' | 'secondary';
 };
 
