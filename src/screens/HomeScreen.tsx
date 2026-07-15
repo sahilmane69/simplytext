@@ -16,9 +16,10 @@ import { MatchedContact, Profile } from '../services';
 type HomeScreenProps = {
   onCreateGroup: () => void;
   onOpenChat: (profile: Profile) => void;
+  onOpenProfile: () => void;
 };
 
-export function HomeScreen({ onCreateGroup, onOpenChat }: HomeScreenProps) {
+export function HomeScreen({ onCreateGroup, onOpenChat, onOpenProfile }: HomeScreenProps) {
   const { contacts, errorMessage, hasPermission, isLoading, loadContacts } = useContacts();
   const [searchQuery, setSearchQuery] = useState('');
   const filteredContacts = useFilteredContacts(contacts, searchQuery);
@@ -39,7 +40,12 @@ export function HomeScreen({ onCreateGroup, onOpenChat }: HomeScreenProps) {
             <Text style={styles.eyebrow}>Contacts</Text>
             <Text style={styles.title}>SimplyText</Text>
           </View>
-          <Pressable accessibilityLabel="Open profile" accessibilityRole="button" style={styles.profileButton}>
+          <Pressable
+            accessibilityLabel="Open profile"
+            accessibilityRole="button"
+            onPress={onOpenProfile}
+            style={styles.profileButton}
+          >
             <Text style={styles.profileButtonText}>P</Text>
           </Pressable>
         </View>
