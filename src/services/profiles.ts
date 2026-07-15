@@ -114,6 +114,22 @@ export async function updatePresencePrivacy(
   return data;
 }
 
+export function subscribeToProfile(userId: string, onProfile: (profile: Profile) => void) {
+  return supabase
+    .channel(`profile:${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        filter: `id=eq.${userId}`,
+        schema: 'public',
+        table: 'profiles',
+      },
+      (payload) => onProfile(payload.new as Profile),
+    )
+    .subscribe();
+}
+
 async function uploadProfilePhoto(userId: string, image: ImagePickerAsset) {
   const response = await fetch(image.uri);
   const arrayBuffer = await response.arrayBuffer();

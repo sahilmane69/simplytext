@@ -53,7 +53,7 @@ export function RootNavigator() {
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [legalDocument, setLegalDocument] = useState<'privacy' | 'terms'>('terms');
   const auth = useAuth();
-  useUserPresence(auth.session?.user.id);
+  useUserPresence(auth.session?.user.id, auth.profile?.show_online_status ?? true);
 
   useEffect(() => {
     if (auth.status === 'loading') {

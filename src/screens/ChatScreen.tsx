@@ -27,6 +27,7 @@ import {
   sendTyping,
   subscribeToOnlineUsers,
   subscribeToMessages,
+  subscribeToProfile,
   subscribeToTyping,
   unsubscribe,
 } from '../services';
@@ -49,13 +50,14 @@ export function ChatScreen({ currentProfile, currentUserId, onBack, target }: Ch
   const [isTyping, setIsTyping] = useState(false);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [remoteProfile, setRemoteProfile] = useState(target.type === 'direct' ? target.profile : null);
   const conversationIdRef = useRef('');
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const chatTitle = target.type === 'direct' ? target.profile.name : target.conversation.name ?? 'Group';
+  const chatTitle = target.type === 'direct' ? remoteProfile?.name ?? target.profile.name : target.conversation.name ?? 'Group';
   const isDirectChat = target.type === 'direct';
-  const otherProfile = isDirectChat ? target.profile : null;
+  const otherProfile = isDirectChat ? remoteProfile : null;
   const isOtherUserOnline = Boolean(
     otherProfile?.show_online_status && onlineUserIds.has(otherProfile.id),
   );
@@ -109,6 +111,22 @@ export function ChatScreen({ currentProfile, currentUserId, onBack, target }: Ch
       setIsLoading(false);
     }
   }, [currentUserId, target]);
+
+  useEffect(() => {
+    setRemoteProfile(target.type === 'direct' ? target.profile : null);
+  }, [target]);
+
+  useEffect(() => {
+    if (!isDirectChat || !remoteProfile) {
+      return undefined;
+    }
+
+    const channel = subscribeToProfile(remoteProfile.id, setRemoteProfile);
+
+    return () => {
+      unsubscribe(channel);
+    };
+  }, [isDirectChat, remoteProfile?.id]);
 
   useEffect(() => {
     loadConversation();

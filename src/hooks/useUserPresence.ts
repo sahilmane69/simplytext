@@ -9,7 +9,7 @@ import {
   untrackOnlineUser,
 } from '../services';
 
-export function useUserPresence(userId: string | null | undefined) {
+export function useUserPresence(userId: string | null | undefined, enabled = true) {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   useEffect(() => {
@@ -17,23 +17,27 @@ export function useUserPresence(userId: string | null | undefined) {
       return undefined;
     }
 
-    const channel = subscribeToOnlineUsers(
-      () => undefined,
-      () => {
-        if (isActiveAppState(AppState.currentState)) {
-          trackOnlineUser(channel, userId);
-        }
-      },
-    );
+    const channel = enabled
+      ? subscribeToOnlineUsers(
+          () => undefined,
+          () => {
+            if (isActiveAppState(AppState.currentState)) {
+              trackOnlineUser(channelRef.current, userId);
+            }
+          },
+        )
+      : null;
     channelRef.current = channel;
 
     const subscription = AppState.addEventListener('change', (state) => {
       if (isActiveAppState(state)) {
-        trackOnlineUser(channel, userId);
+        if (enabled) {
+          trackOnlineUser(channelRef.current, userId);
+        }
         return;
       }
 
-      untrackOnlineUser(channel, userId).catch(() => undefined);
+      untrackOnlineUser(channelRef.current, userId).catch(() => undefined);
     });
 
     return () => {
@@ -42,5 +46,5 @@ export function useUserPresence(userId: string | null | undefined) {
       removePresenceChannel(channelRef.current);
       channelRef.current = null;
     };
-  }, [userId]);
+  }, [enabled, userId]);
 }
