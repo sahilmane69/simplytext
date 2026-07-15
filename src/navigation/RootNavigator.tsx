@@ -52,17 +52,17 @@ export function RootNavigator() {
     }
 
     if (auth.status === 'authenticated') {
-      setRouteName(auth.isFirstSession ? 'ProfileSetup' : 'Home');
+      setRouteName(auth.hasProfile ? 'Home' : 'ProfileSetup');
       return;
     }
 
     if (routeName === 'Home' || routeName === 'ProfileSetup') {
       setRouteName('Login');
     }
-  }, [auth.isFirstSession, auth.status, routeName]);
+  }, [auth.hasProfile, auth.status, routeName]);
 
   const completeLogin = () => {
-    setRouteName(auth.isFirstSession ? 'ProfileSetup' : 'Home');
+    setRouteName(auth.hasProfile ? 'Home' : 'ProfileSetup');
   };
 
   return (
@@ -74,10 +74,11 @@ export function RootNavigator() {
       )}
       {routeName === 'ProfileSetup' && (
         <ProfileSetupScreen
-          onComplete={() => {
-            auth.completeFirstSession();
+          onComplete={async () => {
+            await auth.refreshProfile();
             setRouteName('Home');
           }}
+          userId={auth.session?.user.id}
         />
       )}
       {routeName === 'Home' && <HomeScreen />}

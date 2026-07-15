@@ -1,42 +1,56 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { sendPhoneOtp, signOut, verifyPhoneOtp } from '../services';
+import { getProfile, sendPhoneOtp, signOut, verifyPhoneOtp } from '../services';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
-
-function isFirstLogin(user: User) {
-  if (!user.last_sign_in_at) {
-    return true;
-  }
-
-  return Math.abs(new Date(user.created_at).getTime() - new Date(user.last_sign_in_at).getTime()) < 5000;
-}
 
 export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
-  const [isFirstSession, setIsFirstSession] = useState(false);
+  const [hasProfile, setHasProfile] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
+    const applySession = async (nextSession: Session | null) => {
       if (!mounted) {
         return;
       }
 
-      setSession(data.session);
-      setIsFirstSession(data.session ? isFirstLogin(data.session.user) : false);
-      setStatus(data.session ? 'authenticated' : 'unauthenticated');
+      setSession(nextSession);
+
+      if (!nextSession) {
+        setHasProfile(false);
+        setStatus('unauthenticated');
+        return;
+      }
+
+      const profile = await getProfile(nextSession.user.id);
+
+      if (!mounted) {
+        return;
+      }
+
+      setHasProfile(Boolean(profile));
+      setStatus('authenticated');
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      applySession(data.session);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      setSession(nextSession);
-      setIsFirstSession(nextSession ? event === 'SIGNED_IN' && isFirstLogin(nextSession.user) : false);
-      setStatus(nextSession ? 'authenticated' : 'unauthenticated');
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        setHasProfile(false);
+        setStatus('unauthenticated');
+        return;
+      }
+
+      applySession(nextSession);
     });
 
     return () => {
@@ -48,18 +62,26 @@ export function useAuth() {
   const sendOtp = useCallback((phone: string) => sendPhoneOtp(phone), []);
   const verifyOtp = useCallback((phone: string, token: string) => verifyPhoneOtp(phone, token), []);
   const logout = useCallback(() => signOut(), []);
-  const completeFirstSession = useCallback(() => setIsFirstSession(false), []);
+  const refreshProfile = useCallback(async () => {
+    if (!session) {
+      setHasProfile(false);
+      return;
+    }
+
+    const profile = await getProfile(session.user.id);
+    setHasProfile(Boolean(profile));
+  }, [session]);
 
   return useMemo(
     () => ({
-      completeFirstSession,
-      isFirstSession,
+      hasProfile,
       logout,
+      refreshProfile,
       sendOtp,
       session,
       status,
       verifyOtp,
     }),
-    [completeFirstSession, isFirstSession, logout, sendOtp, session, status, verifyOtp],
+    [hasProfile, logout, refreshProfile, sendOtp, session, status, verifyOtp],
   );
 }

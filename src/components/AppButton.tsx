@@ -2,20 +2,23 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius, spacing } from '../constants';
 
 type AppButtonProps = {
+  disabled?: boolean;
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary';
 };
 
-export function AppButton({ label, onPress, variant = 'primary' }: AppButtonProps) {
+export function AppButton({ disabled = false, label, onPress, variant = 'primary' }: AppButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         variant === 'secondary' && styles.secondary,
-        pressed && styles.pressed,
+        disabled && styles.disabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
       <Text style={[styles.label, variant === 'secondary' && styles.secondaryLabel]}>{label}</Text>
@@ -32,6 +35,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     width: '100%',
+  },
+  disabled: {
+    opacity: 0.56,
   },
   label: {
     color: colors.text,
