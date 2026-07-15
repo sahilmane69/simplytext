@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { getProfile, sendPhoneOtp, signOut, verifyPhoneOtp } from '../services';
+import { getProfile, Profile, sendPhoneOtp, signOut, verifyPhoneOtp } from '../services';
 
 type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -9,6 +9,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [hasProfile, setHasProfile] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const sessionExpiryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export function useAuth() {
       clearSessionExpiryTimeout();
       setSession(null);
       setHasProfile(false);
+      setProfile(null);
       setStatus('unauthenticated');
     };
 
@@ -85,6 +87,7 @@ export function useAuth() {
       }
 
       setHasProfile(Boolean(profile));
+      setProfile(profile);
       setStatus('authenticated');
     };
 
@@ -116,23 +119,26 @@ export function useAuth() {
   const refreshProfile = useCallback(async () => {
     if (!session) {
       setHasProfile(false);
+      setProfile(null);
       return;
     }
 
-    const profile = await getProfile(session.user.id);
-    setHasProfile(Boolean(profile));
+    const nextProfile = await getProfile(session.user.id);
+    setHasProfile(Boolean(nextProfile));
+    setProfile(nextProfile);
   }, [session]);
 
   return useMemo(
     () => ({
       hasProfile,
       logout,
+      profile,
       refreshProfile,
       sendOtp,
       session,
       status,
       verifyOtp,
     }),
-    [hasProfile, logout, refreshProfile, sendOtp, session, status, verifyOtp],
+    [hasProfile, logout, profile, refreshProfile, sendOtp, session, status, verifyOtp],
   );
 }

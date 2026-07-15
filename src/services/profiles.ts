@@ -14,6 +14,7 @@ export type Profile = {
 
 type SaveProfileInput = {
   bio?: string;
+  currentAvatarUrl?: string | null;
   image: ImagePickerAsset | null;
   phone?: string | null;
   username: string;
@@ -34,9 +35,9 @@ export async function getProfile(userId: string) {
   return data;
 }
 
-export async function saveProfile({ bio, image, phone, username, userId }: SaveProfileInput) {
+export async function saveProfile({ bio, currentAvatarUrl, image, phone, username, userId }: SaveProfileInput) {
   const trimmedUsername = username.trim();
-  const avatarUrl = image ? await uploadProfilePhoto(userId, image) : null;
+  const avatarUrl = image ? await uploadProfilePhoto(userId, image) : currentAvatarUrl ?? null;
 
   const { data, error } = await supabase
     .from('profiles')
