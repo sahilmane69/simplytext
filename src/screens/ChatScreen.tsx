@@ -15,6 +15,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { Screen } from '../components';
 import { colors, radius, spacing } from '../constants';
 import {
+  ChatTarget,
   ChatMessage,
   deleteConversationMessages,
   getConversationMessages,
@@ -27,15 +28,14 @@ import {
   subscribeToTyping,
   unsubscribe,
 } from '../services';
-import { Profile } from '../services/profiles';
 
 type ChatScreenProps = {
   currentUserId: string;
   onBack: () => void;
-  profile: Profile;
+  target: ChatTarget;
 };
 
-export function ChatScreen({ currentUserId, onBack, profile }: ChatScreenProps) {
+export function ChatScreen({ currentUserId, onBack, target }: ChatScreenProps) {
   const [conversationId, setConversationId] = useState('');
   const [draft, setDraft] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -46,6 +46,17 @@ export function ChatScreen({ currentUserId, onBack, profile }: ChatScreenProps) 
   const conversationIdRef = useRef('');
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const chatTitle = target.type === 'direct' ? target.profile.name : target.conversation.name ?? 'Group';
+  const chatSubtitle =
+    target.type === 'direct'
+      ? isTyping
+        ? 'Typing'
+        : 'On SimplyText'
+      : isTyping
+        ? 'Typing'
+        : `${target.memberCount} members`;
+  const chatInitial = chatTitle.charAt(0).toUpperCase();
 
   const clearConversationMessages = useCallback(async (silent = false) => {
     const nextConversationId = conversationIdRef.current;
@@ -74,7 +85,10 @@ export function ChatScreen({ currentUserId, onBack, profile }: ChatScreenProps) 
     setErrorMessage('');
 
     try {
-      const conversation = await getOrCreateDirectConversation(currentUserId, profile.id);
+      const conversation =
+        target.type === 'direct'
+          ? await getOrCreateDirectConversation(currentUserId, target.profile.id)
+          : target.conversation;
       const nextMessages = await getConversationMessages(conversation.id);
       await markConversationSeen(conversation.id, currentUserId);
 
@@ -86,7 +100,7 @@ export function ChatScreen({ currentUserId, onBack, profile }: ChatScreenProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId, profile.id]);
+  }, [currentUserId, target]);
 
   useEffect(() => {
     loadConversation();
@@ -228,13 +242,13 @@ export function ChatScreen({ currentUserId, onBack, profile }: ChatScreenProps) 
           </Pressable>
           <View style={styles.headerIdentity}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{profile.name.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.avatarText}>{chatInitial}</Text>
             </View>
             <View style={styles.headerCopy}>
               <Text numberOfLines={1} style={styles.title}>
-                {profile.name}
+                {chatTitle}
               </Text>
-              <Text style={styles.subtitle}>{isTyping ? 'Typing' : 'On SimplyText'}</Text>
+              <Text style={styles.subtitle}>{chatSubtitle}</Text>
             </View>
           </View>
         </View>
