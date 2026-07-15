@@ -7,6 +7,7 @@
     "@react-navigation/native": "^7.3.8",
     "@supabase/supabase-js": "^2.110.5",
     "expo": "~57.0.5",
+    "expo-clipboard": "^57.0.1",
     "expo-contacts": "~57.0.0",
     "expo-image-picker": "~57.0.2",
     "expo-status-bar": "~57.0.0",

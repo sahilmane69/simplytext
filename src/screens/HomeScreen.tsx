@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import {
   ActivityIndicator,
   Image,
+  Linking,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +18,9 @@ import { AppButton, ContactRow, Screen, StatePanel } from '../components';
 import { colors, radius, spacing } from '../constants';
 import { useContacts } from '../hooks';
 import { MatchedContact, Profile } from '../services';
+
+const INVITE_LINK = 'https://simplytext.app';
+const INVITE_MESSAGE = `Join me on SimplyText — a private text-only messaging app. Download here: ${INVITE_LINK}`;
 
 type HomeScreenProps = {
   avatarUrl?: string | null;
@@ -24,7 +32,9 @@ type HomeScreenProps = {
 
 export function HomeScreen({ avatarUrl, onCreateGroup, onOpenChat, onOpenProfile, profileName }: HomeScreenProps) {
   const { contacts, errorMessage, hasPermission, isLoading, loadContacts } = useContacts();
+  const [inviteContact, setInviteContact] = useState<MatchedContact | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
   const filteredContacts = useFilteredContacts(contacts, searchQuery);
   const registeredContacts = useMemo(
     () => filteredContacts.filter((contact) => Boolean(contact.profile)),
@@ -105,6 +115,7 @@ export function HomeScreen({ avatarUrl, onCreateGroup, onOpenChat, onOpenProfile
             <ContactSection
               contacts={inviteContacts}
               emptyText={searchQuery ? 'No invite contacts match your search.' : 'No contacts to invite.'}
+              onInvite={setInviteContact}
               showInvite
               title="Invite"
             />
@@ -120,6 +131,20 @@ export function HomeScreen({ avatarUrl, onCreateGroup, onOpenChat, onOpenProfile
       >
         <Text style={styles.groupButtonText}>+</Text>
       </Pressable>
+
+      <InviteSheet
+        contact={inviteContact}
+        onClose={() => setInviteContact(null)}
+        onCopied={() => {
+          setToastMessage('Invite link copied');
+          setTimeout(() => setToastMessage(''), 2200);
+        }}
+      />
+      {toastMessage ? (
+        <View style={styles.toast}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -127,12 +152,20 @@ export function HomeScreen({ avatarUrl, onCreateGroup, onOpenChat, onOpenProfile
 type ContactSectionProps = {
   contacts: MatchedContact[];
   emptyText: string;
+  onInvite?: (contact: MatchedContact) => void;
   onOpenChat?: (profile: Profile) => void;
   showInvite?: boolean;
   title: string;
 };
 
-function ContactSection({ contacts, emptyText, onOpenChat, showInvite = false, title }: ContactSectionProps) {
+function ContactSection({
+  contacts,
+  emptyText,
+  onInvite,
+  onOpenChat,
+  showInvite = false,
+  title,
+}: ContactSectionProps) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -145,7 +178,7 @@ function ContactSection({ contacts, emptyText, onOpenChat, showInvite = false, t
 
           return (
             <ContactRow
-              accessory={showInvite ? <InviteBadge /> : undefined}
+              accessory={showInvite ? <InviteButton onPress={() => onInvite?.(contact)} /> : undefined}
               isLast={index === contacts.length - 1}
               key={contact.id}
               name={name}
@@ -159,11 +192,66 @@ function ContactSection({ contacts, emptyText, onOpenChat, showInvite = false, t
   );
 }
 
-function InviteBadge() {
+type InviteButtonProps = {
+  onPress: () => void;
+};
+
+function InviteButton({ onPress }: InviteButtonProps) {
   return (
-    <View style={styles.inviteButton}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.inviteButton}>
       <Text style={styles.inviteText}>Invite</Text>
-    </View>
+    </Pressable>
+  );
+}
+
+type InviteSheetProps = {
+  contact: MatchedContact | null;
+  onClose: () => void;
+  onCopied: () => void;
+};
+
+function InviteSheet({ contact, onClose, onCopied }: InviteSheetProps) {
+  const sendSmsInvite = async () => {
+    if (!contact) {
+      return;
+    }
+
+    const phoneNumber = encodeURIComponent(contact.phoneNumbers[0] ?? '');
+    const bodySeparator = Platform.OS === 'ios' ? '&' : '?';
+    const smsUrl = `sms:${phoneNumber}${bodySeparator}body=${encodeURIComponent(INVITE_MESSAGE)}`;
+    const canOpenSms = await Linking.canOpenURL(smsUrl);
+
+    if (canOpenSms) {
+      await Linking.openURL(smsUrl);
+    } else {
+      await Share.share({ message: INVITE_MESSAGE });
+    }
+
+    onClose();
+  };
+
+  const copyInviteLink = async () => {
+    await Clipboard.setStringAsync(INVITE_LINK);
+    onClose();
+    onCopied();
+  };
+
+  return (
+    <Modal animationType="slide" onRequestClose={onClose} transparent visible={Boolean(contact)}>
+      <Pressable accessibilityRole="button" onPress={onClose} style={styles.sheetOverlay}>
+        <Pressable style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Invite {contact?.name ?? 'contact'}</Text>
+          <Text style={styles.sheetText}>Send a native SMS invite or copy your invite link.</Text>
+          <Pressable accessibilityRole="button" onPress={sendSmsInvite} style={styles.sheetAction}>
+            <Text style={styles.sheetActionText}>Send SMS Invite</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={copyInviteLink} style={styles.sheetAction}>
+            <Text style={styles.sheetActionText}>Copy Invite Link</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -287,6 +375,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  sheet: {
+    alignSelf: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    gap: spacing.md,
+    maxWidth: 560,
+    padding: spacing.lg,
+    width: '100%',
+  },
+  sheetAction: {
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderColor: '#2F2F2F',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    justifyContent: 'center',
+    minHeight: 54,
+    paddingHorizontal: spacing.md,
+  },
+  sheetActionText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    height: 4,
+    width: 42,
+  },
+  sheetOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: spacing.lg,
+  },
+  sheetText: {
+    color: colors.muted,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  sheetTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
   section: {
     gap: spacing.sm,
   },
@@ -304,6 +441,20 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 34,
+    fontWeight: '800',
+  },
+  toast: {
+    alignSelf: 'center',
+    backgroundColor: colors.text,
+    borderRadius: radius.md,
+    bottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    position: 'absolute',
+  },
+  toastText: {
+    color: colors.background,
+    fontSize: 14,
     fontWeight: '800',
   },
   topBar: {
