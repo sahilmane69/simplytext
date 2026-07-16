@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sahilmane69.simplytext"
     },
     "android": {
       "adaptiveIcon": {
@@ -16,7 +17,12 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
+      ],
+      "package": "com.sahilmane69.simplytext"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,6 +34,12 @@
           "contactsPermission": "Allow SimplyText to find people you know who are already using the app."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0723992e-3e9d-4be4-a73d-b59495ba0f59"
+      }
+    },
+    "owner": "sahilmane69"
   }
 }
